@@ -14,7 +14,7 @@ using CSV
 using DataFrames
 using YAML
 
-data = YAML.load_file(joinpath(@__DIR__, "data_gep.yaml"))
+data = YAML.load_file(joinpath(@__DIR__, "data_gep_ESS.yaml"))
 repr_days = CSV.read(joinpath(@__DIR__, "Weights_12_reprdays.csv"), DataFrame)
 ts = CSV.read(joinpath(@__DIR__, "Profiles_12_reprdays.csv"), DataFrame)
 

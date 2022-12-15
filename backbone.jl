@@ -14,7 +14,7 @@ using CSV
 using DataFrames
 using YAML
 
-data = YAML.load_file(joinpath(@__DIR__, "data_gep_ESS.yaml"))
+data = YAML.load_file(joinpath(@__DIR__, "data_gep.yaml"))
 repr_days = CSV.read(joinpath(@__DIR__, "Weights_12_reprdays.csv"), DataFrame)
 ts = CSV.read(joinpath(@__DIR__, "Profiles_12_reprdays.csv"), DataFrame)
 
@@ -37,7 +37,6 @@ function define_sets!(m::Model, data::Dict)
     m.ext[:sets][:ID] = [id for id in keys(data["dispatchableGenerators"])] # dispatchable generators
     m.ext[:sets][:IV] = [iv for iv in keys(data["variableGenerators"])] # variable generators
     m.ext[:sets][:I] = union(m.ext[:sets][:ID], m.ext[:sets][:IV]) # all generators
-    m.ext[:sets][:Z] = [z for z in keys(data["ESS"])] # variable generators #Change
 
     # return model
     return m
@@ -69,7 +68,6 @@ function process_parameters!(m::Model, data::Dict, repr_days::DataFrame)
     I = m.ext[:sets][:I]
     ID = m.ext[:sets][:ID]
     IV = m.ext[:sets][:IV]
-    Z = m.ext[:sets][:Z] #Change
 
     # generate a dictonary "parameters"
     m.ext[:parameters] = Dict()
@@ -85,18 +83,6 @@ function process_parameters!(m::Model, data::Dict, repr_days::DataFrame)
     β = m.ext[:parameters][:β] = Dict(i => d[i]["fuelCosts"] for i in ID) #EUR/MWh
     δ = m.ext[:parameters][:δ] = Dict(i => d[i]["emissions"] for i in ID) #ton/MWh
     m.ext[:parameters][:VC] = Dict(i => β[i]+αCO2*δ[i] for i in ID) # variable costs - EUR/MWh
-
-    
-    ESS = data["ESS"]
-    m.ext[:parameters][η_sup] = Dict(z => ESS[z]["eff_sup"] for z in Z) # ESS supply efficiencies #Change 
-    m.ext[:parameters][η_abs] = Dict(z => ESS[z]["eff_abs"] for z in Z) # ESS absorb efficiencies #Change 
-    m.ext[:parameters][:E_max] = Dict(z => ESS[z]["stored_energy_max"] for z in Z) # maximal stored capacity for respective ESS #Change 
-    m.ext[:parameters][:SOC_min] = Dict(z => ESS[z]["SOC_min"] for z in Z) # minimum state of charge of ESS type s unit j (%) #Change 
-    m.ext[:parameters][:SOC_max] = Dict(z => ESS[z]["SOC_max"] for z in Z) # maximum state of charge of ESS type s unit j (%) #Change 
-    m.ext[:parameters][:p_abs_min] = Dict(z => ESS[z]["p_abs_min"] for z in Z) # minimal internal power input #Change 
-    m.ext[:parameters][:p_abs_max] = Dict(z => ESS[z]["p_abs_max"] for z in Z) # maximal internal power input #Change 
-    m.ext[:parameters][:p_sup_min] = Dict(z => ESS[z]["p_sup_min"] for z in Z) # minimal internal power output #Change 
-    m.ext[:parameters][:p_sup_max] = Dict(z => ESS[z]["p_sup_max"] for z in Z) # maximal internal power output #Change 
     
     # Investment costs
     OC = m.ext[:parameters][:OC] = Dict(i => d[i]["OC"] for i in I) # EUR/MW
@@ -130,7 +116,6 @@ function build_greenfield_1Y_GEP_model!(m::Model)
     IV = m.ext[:sets][:IV]
     JH = m.ext[:sets][:JH]
     JD = m.ext[:sets][:JD]
-    Z = m.ext[:sets][:Z] #Change
 
     # Extract time series data
     D = m.ext[:timeseries][:D] # demand
@@ -141,23 +126,11 @@ function build_greenfield_1Y_GEP_model!(m::Model)
     VC = m.ext[:parameters][:VC] # variable cost
     IC = m.ext[:parameters][:IC] # investment cost
     W = m.ext[:parameters][:W] # weights
-    η_sup = m.ext[:parameters][η_sup] # ESS supply efficiencies #Change 
-    η_abs = m.ext[:parameters][η_abs] # ESS absorb efficiencies #Change 
-    E_max = m.ext[:parameters][:E_max] # maximal stored capacity for respective ESS #Change 
-    SOC_min = m.ext[:parameters][:SOC_min] # minimum state of charge of ESS type s unit j (%) #Change 
-    SOC_max = m.ext[:parameters][:SOC_max] # maximum state of charge of ESS type s unit j (%) #Change 
-    P_abs_min = m.ext[:parameters][:p_abs_min] # minimal internal power input #Change 
-    P_abs_max = m.ext[:parameters][:p_abs_max] # maximal internal power input #Change 
-    P_sup_min = m.ext[:parameters][:p_sup_min] # minimal internal power output #Change 
-    P_sup_max = m.ext[:parameters][:p_sup_max] # maximal internal power output #Change 
 
     # Create variablesabs
     cap = m.ext[:variables][:cap] = @variable(m, [i=I], lower_bound=0, base_name="capacity")
     g = m.ext[:variables][:g] = @variable(m, [i=I,jh=JH,jd=JD], lower_bound=0, base_name="generation")
     ens = m.ext[:variables][:ens] = @variable(m, [jh=JH,jd=JD], lower_bound=0, base_name="energy_not_served")
-    P_abs = m.ext[:variables][:P_abs] = @variable(m, [z=Z,jh=JH,jd=JD], lower_bound=0, base_name="power_asborbed") #Change
-    P_sup = m.ext[:variables][:P_sup] = @variable(m, [z=Z,jh=JH,jd=JD], lower_bound=0, base_name="power_supplied") #Change 
-    E = m.ext[:variables][:E] = @variable(m, [z=Z,jh=JH,jd=JD], lower_bound=0, base_name="power_stored") #Change
 
     # Create affine expressions (= linear combinations of variables)
     curt = m.ext[:expressions][:curt] = @expression(m, [i=IV,jh=JH,jd=JD],
@@ -173,7 +146,7 @@ function build_greenfield_1Y_GEP_model!(m::Model)
 
     # 2a - power balance
     m.ext[:constraints][:con2a] = @constraint(m, [jh=JH,jd=JD,z=Z],
-        sum(g[i,jh,jd] for i in I) + sum(P_sup[z,jh,jd]*η_sup[z]) == D[jh,jd] - ens[jh,jd] + sum(P_abs[z,jh,jd]/η_abs[z])#Change
+        sum(g[i,jh,jd] for i in I) == D[jh,jd] - ens[jh,jd]
     )
 
     # 2c2 - load shedding
@@ -189,36 +162,6 @@ function build_greenfield_1Y_GEP_model!(m::Model)
     # 3a1 - conventional
     m.ext[:constraints][:con3a1conv] = @constraint(m, [i=ID,jh=JH,jd=JD],
         g[i,jh,jd] <= cap[i]
-    )
-
-    #4a - ESS balance constraint #Change
-    m.ext[:constraints][:con4a] = @constraint(m, [z=Z,jh=JH,jd=JD],
-        E[z,jh,jd] = E[z,jh-1,jd] + P_abs[z,jh,jd] - P_sup[z,jh,jd]
-    )
-
-    #4b1 - 1st hour of the day constraint #Change
-    m.ext[:constraints][:con4b1] = @constraint(m, [z=Z,jd=JD],
-        E[z,1,jd] = E_max[z]*SOC_min[z]
-    )
-
-    #4b2 - 24th hour of the day constraint #Change
-    m.ext[:constraints][:con4b2] = @constraint(m, [z=Z,jd=JD],
-        E[z,24,jd] = E_max[z]*SOC_min[z]
-    )
-
-    #4c1 - Power absorbed #Change
-    m.ext[:constraints][:con4c1] = @constraint(m, [z=Z,jh=JH,jd=JD],
-        P_abs_min[z] <= P_abs[z,jh,jd] <= P_abs_max[z]  
-    )
-
-    #4c2 - Power supplied #Change
-    m.ext[:constraints][:con4c2] = @constraint(m, [z=Z,jh=JH,jd=JD],
-        P_sup_min[z] <= P_sup[z,jh,jd] <= P_sup_max[z]  
-    )
-
-    #4c3 - State of charge #Change
-    m.ext[:constraints][:con4b2] = @constraint(m, [z=Z,jh=JH,jd=JD],
-        E_max[z]*SOC_min[z] <= E[z,jh,jd] <= E_max[z]*SOC_max[z] 
     )
 
     return m
@@ -301,7 +244,6 @@ using StatsPlots
 JH = m.ext[:sets][:JH]
 JD = m.ext[:sets][:JD]
 I = m.ext[:sets][:I]
-Z = m.ext[:sets][:Z] #Change
 
 # parameters
 D = m.ext[:timeseries][:D]
@@ -314,17 +256,11 @@ g = value.(m.ext[:variables][:g])
 ens = value.(m.ext[:variables][:ens])
 curt = value.(m.ext[:expressions][:curt])
 λ = dual.(m.ext[:constraints][:con2a])
-P_abs =value.(m.ext[:variables][:P_abs]) #Change
-P_sup = value.(m.ext[:variables][:P_sup]) #Change
-E = value.(m.ext[:variables][:E]) #Change
 
 # create arrays for plotting
 λvec = [λ[jh,jd]/W[jd] for jh in JH, jd in JD]
 gvec = [g[i,jh,jd] for i in I, jh in JH, jd in JD]
 capvec = [cap[i] for  i in I]
-ESSvec = [E[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
-P_absvec  = [P_abs[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
-P_supvec = [P_sup[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
 
 
 # Select day for which you'd like to plotting
@@ -340,9 +276,7 @@ plot!(p2, JH, D[:,jd], label ="Demand", xlabel="Timesteps [-]", ylabel="Generati
 # Capacity
 p3 = bar(capvec, label="", xticks=(1:length(capvec), ["Mid" "Base" "Peak" "Wind" "Solar"]), xlabel="Technology [-]", ylabel="New capacity [MW]", legend=:outertopright);
 
-# ESS
-p4 =  bar(ESSvec, label="", xticks=(1:length(ESSvec), ["PSH" "BESS"]),xlabel="Type of ESS [-]", ylabel="State of ESS [MW]", legend=:outertopright);
 
 # combine
-plot(p1, p2, p3, p4, layout = (4,1))
+plot(p1, p2, p3, layout = (3,1))
 plot!(size=(1500,1500))
