@@ -1,0 +1,62 @@
+# general parameters
+VOLL: 1000 # EUR / MWh
+CO2Price: 25 # EUR / ton
+nTimesteps: 24 # number of timesteps per representative day
+nReprDays: 12 # days
+discountrate: 0.05 # -
+
+# Generator parameters
+dispatchableGenerators:
+ Base:
+  OC: 5000000 # EUR/MW
+  fuelCosts: 10 # EUR/MWh
+  emissions: 0.8 # ton/MWh
+  lifetime: 40 # years
+  legcap: 4000 # MW
+
+ Mid:
+  OC: 1000000 # EUR/MW
+  fuelCosts: 50 # EUR/MWh
+  emissions: 0.3 # ton/MWh
+  lifetime: 25 # years
+  legcap: 4000 # MW
+
+ Peak:
+  OC: 500000 # EUR/MW
+  fuelCosts: 100 # EUR/MWh
+  emissions: 0.5 # ton/MWh
+  lifetime: 15 # years
+  legcap: 3000 # MW
+
+variableGenerators:
+ Wind:
+  OC: 1500000 # EUR/MW
+  lifetime: 20 # years
+  legcap: 4000 # MW
+
+ Solar:
+  OC: 1000000 # EUR/MW
+  lifetime: 20 # years
+  legcap: 4000 # MW
+
+ESS:
+  PSH: # Pumped storage Hydropower 
+    eff_sup:  86.6 # %
+    eff_abs: 86.6 # %
+    stored_energy_max: 3924 # MWh
+    SOC_min: 0 # %
+    SOC_max: 100 # %
+    p_abs_min: # MW
+    p_abs_max: # MW
+    p_sup_min: # MW
+    p_sup_max: # MW
+  BESS: # Battery energy storage solutions (Tesla Megapacks)
+    eff_sup: 97.5 # %
+    eff_abs: 97.5 # %
+    stored_energy_max: 196 # MWh
+    SOC_min: 10 # %
+    SOC_max: 90 # %
+    p_abs_min: # MW
+    p_abs_max: # MW
+    p_sup_min: # MW
+    p_sup_max: # MW 
