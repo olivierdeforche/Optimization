@@ -40,16 +40,16 @@ variableGenerators:
   legcap: 4000 # MW
 
 ESS:
-  PSH: # Pumped storage Hydropower 
-    eff_sup:  86.6 # %
-    eff_abs: 86.6 # %
-    stored_energy_max: 3924 # MWh
-    SOC_min: 0 # %
-    SOC_max: 100 # %
-    p_abs_min: # MW
-    p_abs_max: # MW
-    p_sup_min: # MW
-    p_sup_max: # MW
+  # PSH: # Pumped storage Hydropower 
+  #   eff_sup:  86.6 # %
+  #   eff_abs: 86.6 # %
+  #   stored_energy_max: 3924 # MWh
+  #   SOC_min: 0 # %
+  #   SOC_max: 100 # %
+  #   p_abs_min: # MW
+  #   p_abs_max: # MW
+  #   p_sup_min: # MW
+  #   p_sup_max: # MW
   BESS: # Battery energy storage solutions (Tesla Megapacks)
     eff_sup: 97.5 # %
     eff_abs: 97.5 # %
@@ -57,6 +57,6 @@ ESS:
     SOC_min: 10 # %
     SOC_max: 90 # %
     p_abs_min: # MW
-    p_abs_max: # MW
+    p_abs_max: 196/3 # MW
     p_sup_min: # MW
     p_sup_max: # MW 

@@ -172,8 +172,8 @@ function build_greenfield_1Y_GEP_model!(m::Model)
     )
 
     # 2a - power balance
-    m.ext[:constraints][:con2a] = @constraint(m, [jh=JH,jd=JD,z=Z],
-        sum(g[i,jh,jd] for i in I) + sum(P_sup[z,jh,jd]*η_sup[z]) == D[jh,jd] - ens[jh,jd] + sum(P_abs[z,jh,jd]/η_abs[z])#Change
+    m.ext[:constraints][:con2a] = @constraint(m, [jh=JH,jd=JD],
+        sum(g[i,jh,jd] for i in I) + sum(P_sup[z,jh,jd]*η_sup[z] for z in Z) == D[jh,jd] - ens[jh,jd] + sum(P_abs[z,jh,jd]/η_abs[z] for z in Z)#Change
     )
 
     # 2c2 - load shedding
@@ -192,18 +192,13 @@ function build_greenfield_1Y_GEP_model!(m::Model)
     )
 
     #4a - ESS balance constraint #Change
-    m.ext[:constraints][:con4a] = @constraint(m, [z=Z,jh=JH,jd=JD],
+    m.ext[:constraints][:con4a] = @constraint(m, [z=Z,jh=JH[2:],jd=JD],
         E[z,jh,jd] = E[z,jh-1,jd] + P_abs[z,jh,jd] - P_sup[z,jh,jd]
     )
 
     #4b1 - 1st hour of the day constraint #Change
     m.ext[:constraints][:con4b1] = @constraint(m, [z=Z,jd=JD],
-        E[z,1,jd] = E_max[z]*SOC_min[z]
-    )
-
-    #4b2 - 24th hour of the day constraint #Change
-    m.ext[:constraints][:con4b2] = @constraint(m, [z=Z,jd=JD],
-        E[z,24,jd] = E_max[z]*SOC_min[z]
+        E[z,1,jd] = E[z,24,jd]
     )
 
     #4c1 - Power absorbed #Change
