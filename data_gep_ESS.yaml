@@ -40,23 +40,23 @@ variableGenerators:
   legcap: 4000 # MW
 
 ESS:
-  # PSH: # Pumped storage Hydropower 
-  #   eff_sup:  86.6 # %
-  #   eff_abs: 86.6 # %
-  #   stored_energy_max: 3924 # MWh
-  #   SOC_min: 0 # %
-  #   SOC_max: 100 # %
-  #   p_abs_min: # MW
-  #   p_abs_max: # MW
-  #   p_sup_min: # MW
-  #   p_sup_max: # MW
-  BESS: # Battery energy storage solutions (Tesla Megapacks)
-    eff_sup: 97.5 # %
-    eff_abs: 97.5 # %
-    stored_energy_max: 196 # MWh
-    SOC_min: 10 # %
-    SOC_max: 90 # %
-    p_abs_min: # MW
-    p_abs_max: 196/3 # MW
-    p_sup_min: # MW
-    p_sup_max: # MW 
+ PSH: # Pumped storage Hydropower # Unsure about pin and max and sup and abs taken equal # source: https://corporate.engie.be/nl/press/release/engie-breidt-de-opslagcapaciteit-van-de-pompcentrale-van-coo-uit en https://corporate.engie.be/nl/energy/water/spaarbekkencentrale-coo
+  eff_sup:  0.86 # %
+  eff_abs: 0.86 # %
+  stored_energy_max: 6000 # MWh
+  SOC_min: 0 # %
+  SOC_max: 1 # %
+  p_abs_min: 0 # MW
+  p_abs_max: 1080 # MW
+  p_sup_min: 0 # MW
+  p_sup_max: 1080 # MW
+ BESS: # Battery energy storage solutions (Tesla Megapacks)
+  eff_sup: 0.975 # %
+  eff_abs: 0.975 # %
+  stored_energy_max: 196 # MWh
+  SOC_min: 0.10 # %
+  SOC_max: 0.90 # %
+  p_abs_min: 0 # MW
+  p_abs_max: 65 # MW
+  p_sup_min: 0 # MW
+  p_sup_max: 65 # MW 

@@ -20,6 +20,7 @@ ts = CSV.read(joinpath(@__DIR__, "Profiles_12_reprdays.csv"), DataFrame)
 
 print(repr_days)
 print(ts)
+print(data["ESS"])
 
 ## Step 2: create model & pass data to model
 using JuMP
@@ -88,8 +89,8 @@ function process_parameters!(m::Model, data::Dict, repr_days::DataFrame)
 
     
     ESS = data["ESS"]
-    m.ext[:parameters][η_sup] = Dict(z => ESS[z]["eff_sup"] for z in Z) # ESS supply efficiencies #Change 
-    m.ext[:parameters][η_abs] = Dict(z => ESS[z]["eff_abs"] for z in Z) # ESS absorb efficiencies #Change 
+    m.ext[:parameters][:η_sup] = Dict(z => ESS[z]["eff_sup"] for z in Z) # ESS supply efficiencies #Change 
+    m.ext[:parameters][:η_abs] = Dict(z => ESS[z]["eff_abs"] for z in Z) # ESS absorb efficiencies #Change 
     m.ext[:parameters][:E_max] = Dict(z => ESS[z]["stored_energy_max"] for z in Z) # maximal stored capacity for respective ESS #Change 
     m.ext[:parameters][:SOC_min] = Dict(z => ESS[z]["SOC_min"] for z in Z) # minimum state of charge of ESS type s unit j (%) #Change 
     m.ext[:parameters][:SOC_max] = Dict(z => ESS[z]["SOC_max"] for z in Z) # maximum state of charge of ESS type s unit j (%) #Change 
@@ -141,8 +142,8 @@ function build_greenfield_1Y_GEP_model!(m::Model)
     VC = m.ext[:parameters][:VC] # variable cost
     IC = m.ext[:parameters][:IC] # investment cost
     W = m.ext[:parameters][:W] # weights
-    η_sup = m.ext[:parameters][η_sup] # ESS supply efficiencies #Change 
-    η_abs = m.ext[:parameters][η_abs] # ESS absorb efficiencies #Change 
+    η_sup = m.ext[:parameters][:η_sup] # ESS supply efficiencies #Change 
+    η_abs = m.ext[:parameters][:η_abs] # ESS absorb efficiencies #Change 
     E_max = m.ext[:parameters][:E_max] # maximal stored capacity for respective ESS #Change 
     SOC_min = m.ext[:parameters][:SOC_min] # minimum state of charge of ESS type s unit j (%) #Change 
     SOC_max = m.ext[:parameters][:SOC_max] # maximum state of charge of ESS type s unit j (%) #Change 
@@ -192,14 +193,24 @@ function build_greenfield_1Y_GEP_model!(m::Model)
     )
 
     #4a - ESS balance constraint #Change
-    m.ext[:constraints][:con4a] = @constraint(m, [z=Z,jh=JH[2:],jd=JD],
-        E[z,jh,jd] = E[z,jh-1,jd] + P_abs[z,jh,jd] - P_sup[z,jh,jd]
+    m.ext[:constraints][:con4a] = @constraint(m, [z=Z,jh=JH[2:end],jd=JD],
+        E[z,jh,jd] == E[z,jh-1,jd] + P_abs[z,jh,jd] - P_sup[z,jh,jd]
     )
+
+    # #4b1 - 1st hour of the day constraint #Change
+    # m.ext[:constraints][:con4b1] = @constraint(m, [z=Z,jd=JD],
+    #     E[z,1,jd] == E[z,24,jd]
+    # )
 
     #4b1 - 1st hour of the day constraint #Change
     m.ext[:constraints][:con4b1] = @constraint(m, [z=Z,jd=JD],
-        E[z,1,jd] = E[z,24,jd]
+        E[z,1,jd] == E_max[z]*SOC_min[z]
     )
+
+    #4b2 - 24th hour of the day constraint #Change
+    m.ext[:constraints][:con4b1] = @constraint(m, [z=Z,jd=JD],
+        E[z,24,jd] == E_max[z]*SOC_min[z]
+    ) 
 
     #4c1 - Power absorbed #Change
     m.ext[:constraints][:con4c1] = @constraint(m, [z=Z,jh=JH,jd=JD],
@@ -264,12 +275,14 @@ function build_brownfield_1Y_GEP_model!(m::Model)
 end
 
 # Build your model
-# build_greenfield_1Y_GEP_model!(m)
-build_brownfield_1Y_GEP_model!(m)
+build_greenfield_1Y_GEP_model!(m)
+# build_brownfield_1Y_GEP_model!(m)
+
 
 ## Step 4: solve
 # current model is incomplete, so all variables and objective will be zero
 optimize!(m)
+
 
 # check termination status
 print(
@@ -321,7 +334,14 @@ ESSvec = [E[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
 P_absvec  = [P_abs[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
 P_supvec = [P_sup[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
 
-
+# d = merge(gvec,ESSvec)
+# print(d)
+print(size(ESSvec))
+print(size(P_absvec))
+print(size(D))
+print(ESSvec[1][1][1])
+print(ESSvec[2][1][1])
+priunt(gvec[1][1][1]+gvec[2][1][1]+gvec[3][1][1]+gvec[4][1][1]+gvec[5][1][1]+gvec[6][1][1])
 # Select day for which you'd like to plotting
 jd = 1
 
@@ -336,8 +356,12 @@ plot!(p2, JH, D[:,jd], label ="Demand", xlabel="Timesteps [-]", ylabel="Generati
 p3 = bar(capvec, label="", xticks=(1:length(capvec), ["Mid" "Base" "Peak" "Wind" "Solar"]), xlabel="Technology [-]", ylabel="New capacity [MW]", legend=:outertopright);
 
 # ESS
-p4 =  bar(ESSvec, label="", xticks=(1:length(ESSvec), ["PSH" "BESS"]),xlabel="Type of ESS [-]", ylabel="State of ESS [MW]", legend=:outertopright);
+p4 = groupedbar(transpose(ESSvec[:,:,jd]), label=["BESS    " "PSH"], xlabel="Timesteps [-]", ylabel="Storage [MWh]", bar_position = :stack,legend=:outertopright,ylims=(0,13_000));
+plot!(p4, JH, P_absvec[1,:,jd]+P_absvec[2,:,jd], label ="E abs", legend=:outertopright, lindewidth=3, lc=:black);
+plot!(p4, JH, P_supvec[1,:,jd]+P_supvec[2,:,jd], label ="E sup", legend=:outertopright, lindewidth=3, lc=:red);
+
+# p4 = groupedbar(transpose(ESSvec[:,:,jd]), label=["PSH"], bar_position = :stack,legend=:outertopright,ylims=(0,13_000));
 
 # combine
-plot(p1, p2, p3, p4, layout = (4,1))
-plot!(size=(1500,1500))
+plot(p1, p2, p3, p4, layout = (4,2))
+plot!(size=(1500,1000))
