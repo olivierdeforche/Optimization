@@ -373,11 +373,16 @@ end
 print("done")
 
 
-# Oli: Model afmaken
-# Ipopt instead of gurobi
-
-# Bekend worden met Jump    
-# which solver and what type of problem and why --> jump decides it for us right now (kunnen we uit jump halen?)
-# see difference between both model and then check what type of problem and which solver jump uses.
-# is het convex of ni
+# Oli: Overleaf: context + model + oplossing
 # Lagrangian ne keer checken!
+
+# Bas: Vercshillende methods van gurobi runnen (checken of ons probleem echt een MILP is via dit)
+# Ipopt checken
+# Andere solvers met andere methodes checken
+
+# which solver and what type of problem and why --> jump decides it for us right now (kunnen we uit jump halen?)
+
+# is het convex of ni --> het is convex
+
+# To be seen later:
+# See difference between both model and then check what type of problem and which solver jump uses.
