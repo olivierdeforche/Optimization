@@ -1,8 +1,6 @@
 ## Backbone to structure your code
-# author: Kenneth Bruninx
-# last update: October 26, 2020
-# description: backbone to structure your code. You're not obliged to use this
-# in your assignment, but you may.
+# author: Olivier Deforche
+# last update: December 2022, 2022
 
 ## Step 0: Activate environment - ensure consistency accross computers
 using Pkg
@@ -18,14 +16,14 @@ data = YAML.load_file(joinpath(@__DIR__, "data_gep_ESS.yaml"))
 repr_days = CSV.read(joinpath(@__DIR__, "Weights_12_reprdays.csv"), DataFrame)
 ts = CSV.read(joinpath(@__DIR__, "Profiles_12_reprdays.csv"), DataFrame)
 
-print(repr_days)
-print(ts)
-print(data["ESS"])
-
 ## Step 2: create model & pass data to model
 using JuMP
 using Gurobi
+using Ipopt
+
+# Choose Optimizer
 m = Model(optimizer_with_attributes(Gurobi.Optimizer))
+# m = Model(optimizer_with_attributes(Ipopt.Optimizer))
 
 # Step 2a: create sets
 function define_sets!(m::Model, data::Dict)
@@ -197,17 +195,22 @@ function build_greenfield_1Y_GEP_model!(m::Model)
         E[z,jh,jd] == E[z,jh-1,jd] + P_abs[z,jh,jd] - P_sup[z,jh,jd]
     )
 
-    # #4b1 - 1st hour of the day constraint #Change
+    # #4b1 - 1st hour of the day constraint (Kristof) #Change
     # m.ext[:constraints][:con4b1] = @constraint(m, [z=Z,jd=JD],
     #     E[z,1,jd] == E[z,24,jd]
     # )
 
-    #4b1 - 1st hour of the day constraint #Change
+    #4b2 - 1st hour of the day constraint (Kristof) #Change
+    m.ext[:constraints][:con4b2] = @constraint(m, [z=Z,jd=JD],
+        P_sup[z,1,jd] == 0
+    )
+
+    #4b1 - 1st hour of the day constraint (Paper) #Change
     m.ext[:constraints][:con4b1] = @constraint(m, [z=Z,jd=JD],
         E[z,1,jd] == E_max[z]*SOC_min[z]
     )
 
-    #4b2 - 24th hour of the day constraint #Change
+    #4b2 - 24th hour of the day constraint (Paper) #Change
     m.ext[:constraints][:con4b1] = @constraint(m, [z=Z,jd=JD],
         E[z,24,jd] == E_max[z]*SOC_min[z]
     ) 
@@ -313,9 +316,11 @@ Z = m.ext[:sets][:Z] #Change
 
 # parameters
 D = m.ext[:timeseries][:D]
+AF = m.ext[:timeseries][:AF] 
+Wind = AF["Wind"]
+Solar = AF["Solar"]
 W = m.ext[:parameters][:W]
 LC = m.ext[:parameters][:LC]
-
 # variables/expressions
 cap = value.(m.ext[:variables][:cap])
 g = value.(m.ext[:variables][:g])
@@ -334,34 +339,45 @@ ESSvec = [E[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
 P_absvec  = [P_abs[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
 P_supvec = [P_sup[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
 
-# d = merge(gvec,ESSvec)
-# print(d)
-print(size(ESSvec))
-print(size(P_absvec))
-print(size(D))
-print(ESSvec[1][1][1])
-print(ESSvec[2][1][1])
-priunt(gvec[1][1][1]+gvec[2][1][1]+gvec[3][1][1]+gvec[4][1][1]+gvec[5][1][1]+gvec[6][1][1])
-# Select day for which you'd like to plotting
-jd = 1
+for jd in 1:12
+    # Electricity price 
+    p1 = plot(JH,λvec[:,jd], xlabel="Timesteps [-]", ylabel="λ [EUR/MWh]", label="λ [EUR/MWh]", legend=:outertopright);
 
-# Electricity price 
-p1 = plot(JH,λvec[:,jd], xlabel="Timesteps [-]", ylabel="λ [EUR/MWh]", label="λ [EUR/MWh]", legend=:outertopright );
+    # Dispatch
+    p2 = groupedbar(transpose(gvec[:,:,jd]), label=["Mid" "Base" "Peak" "Wind" "Solar"], bar_position = :stack,legend=:outertopright,ylims=(0,13_000));
+    plot!(p2, JH, D[:,jd], label ="Demand", xlabel="Timesteps [-]", ylabel="Generation [MWh]", legend=:outertopright, lindewidth=3, lc=:black);
 
-# Dispatch
-p2 = groupedbar(transpose(gvec[:,:,jd]), label=["Mid" "Base" "Peak" "Wind" "Solar"], bar_position = :stack,legend=:outertopright,ylims=(0,13_000));
-plot!(p2, JH, D[:,jd], label ="Demand", xlabel="Timesteps [-]", ylabel="Generation [MWh]", legend=:outertopright, lindewidth=3, lc=:black);
+    # Capacity
+    p3 = bar(capvec, label="", xticks=(1:length(capvec), ["Mid" "Base" "Peak" "Wind" "Solar"]), xlabel="Technology [-]", ylabel="New capacity [MW]", legend=:outertopright);
 
-# Capacity
-p3 = bar(capvec, label="", xticks=(1:length(capvec), ["Mid" "Base" "Peak" "Wind" "Solar"]), xlabel="Technology [-]", ylabel="New capacity [MW]", legend=:outertopright);
+    # ESS
+    p4 = groupedbar(transpose(ESSvec[:,:,jd]), label=["BESS    " "PSH"], xlabel="Timesteps [-]", ylabel="Storage [MWh]", bar_position = :stack,legend=:outertopright,ylims=(0,8_000));
+    plot!(p4, JH, P_absvec[1,:,jd]+P_absvec[2,:,jd], label ="E abs", legend=:outertopright, lindewidth=3, lc=:black);
+    plot!(p4, JH, P_supvec[1,:,jd]+P_supvec[2,:,jd], label ="E sup", legend=:outertopright, lindewidth=3, lc=:red);
 
-# ESS
-p4 = groupedbar(transpose(ESSvec[:,:,jd]), label=["BESS    " "PSH"], xlabel="Timesteps [-]", ylabel="Storage [MWh]", bar_position = :stack,legend=:outertopright,ylims=(0,13_000));
-plot!(p4, JH, P_absvec[1,:,jd]+P_absvec[2,:,jd], label ="E abs", legend=:outertopright, lindewidth=3, lc=:black);
-plot!(p4, JH, P_supvec[1,:,jd]+P_supvec[2,:,jd], label ="E sup", legend=:outertopright, lindewidth=3, lc=:red);
+    # p4 = groupedbar(transpose(ESSvec[:,:,jd]), label=["PSH"], bar_position = :stack,legend=:outertopright,ylims=(0,13_000));
 
-# p4 = groupedbar(transpose(ESSvec[:,:,jd]), label=["PSH"], bar_position = :stack,legend=:outertopright,ylims=(0,13_000));
+    # AF
+    p5 = plot(JH, Wind[:,jd],  label ="Wind", lindewidth=3, lc=:black);
+    plot!(p5, JH, Solar[:,jd], label ="Solar", xlabel="Timesteps [-]", ylabel="AF [0-1]", legend=:outertopright, lindewidth=3, lc=:red);
 
-# combine
-plot(p1, p2, p3, p4, layout = (4,2))
-plot!(size=(1500,1000))
+    # combine
+    plot(p1, p2, p3, p4,p5, layout = (5,1))
+    # plot!()
+    plot!(size=(700,700))
+
+    # Save plots
+    # savefig("day"*string(jd)*"Ipopt")
+    savefig("day"*string(jd)*"Gurobi")
+end
+print("done")
+
+
+# Oli: Model afmaken
+# Ipopt instead of gurobi
+
+# Bekend worden met Jump    
+# which solver and what type of problem and why --> jump decides it for us right now (kunnen we uit jump halen?)
+# see difference between both model and then check what type of problem and which solver jump uses.
+# is het convex of ni
+# Lagrangian ne keer checken!
