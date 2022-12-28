@@ -148,11 +148,6 @@ function build_greenfield_1Y_GEP_model!(m::Model)
     m.ext[:constraints][:con2a] = @constraint(m, [jh=JH,jd=JD,z=Z],
         sum(g[i,jh,jd] for i in I) == D[jh,jd] - ens[jh,jd]
     )
-
-    # 2c2 - load shedding
-    m.ext[:constraints][:con2c] = @constraint(m, [jh=JH,jd=JD],
-        ens[jh,jd] <= D[jh,jd]
-    )
     
     # 3a1 - renewables 
     m.ext[:constraints][:con3a1res] = @constraint(m, [i=IV,jh=JH,jd=JD],
