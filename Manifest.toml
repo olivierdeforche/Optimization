@@ -2,7 +2,7 @@
 
 julia_version = "1.8.2"
 manifest_format = "2.0"
-project_hash = "64e988708ce5a682ad065c455e90c194ed46787c"
+project_hash = "c68cf4c2e2f0b8ef8c31273f939d69960cb9931a"
 
 [[deps.ASL_jll]]
 deps = ["Artifacts", "JLLWrappers", "Libdl", "Pkg"]
@@ -104,6 +104,18 @@ git-tree-sha1 = "38f7a08f19d8810338d4f5085211c7dfa5d5bdd8"
 uuid = "9e997f8a-9a97-42d5-a9f1-ce6bfc15e2c0"
 version = "0.1.4"
 
+[[deps.Clp]]
+deps = ["Clp_jll", "MathOptInterface"]
+git-tree-sha1 = "8588186cc9b298ef08dda8732d96fb57ed993e1b"
+uuid = "e2554f3b-3117-50c0-817c-e040a3ddf72d"
+version = "1.0.0"
+
+[[deps.Clp_jll]]
+deps = ["Artifacts", "CoinUtils_jll", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "METIS_jll", "MUMPS_seq_jll", "OpenBLAS32_jll", "Osi_jll", "Pkg"]
+git-tree-sha1 = "5e4f9a825408dc6356e6bf1015e75d2b16250ec8"
+uuid = "06985876-5285-5a41-9fcb-8948a742cc53"
+version = "100.1700.600+0"
+
 [[deps.Clustering]]
 deps = ["Distances", "LinearAlgebra", "NearestNeighbors", "Printf", "Random", "SparseArrays", "Statistics", "StatsBase"]
 git-tree-sha1 = "64df3da1d2a26f4de23871cd1b6482bb68092bd5"
@@ -121,6 +133,12 @@ deps = ["TranscodingStreams", "Zlib_jll"]
 git-tree-sha1 = "ded953804d019afa9a3f98981d99b33e3db7b6da"
 uuid = "944b1d66-785c-5afd-91f1-9de20f533193"
 version = "0.7.0"
+
+[[deps.CoinUtils_jll]]
+deps = ["Artifacts", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "OpenBLAS32_jll", "Pkg"]
+git-tree-sha1 = "5e9852361e31af66143665e780535df262fa3407"
+uuid = "be027038-0da8-5614-b30d-e42594cb92df"
+version = "200.1100.600+0"
 
 [[deps.ColorSchemes]]
 deps = ["ColorTypes", "ColorVectorSpace", "Colors", "FixedPointNumbers", "Random"]
@@ -798,6 +816,12 @@ version = "1.3.2+0"
 git-tree-sha1 = "85f8e6578bf1f9ee0d11e7bb1b1456435479d47c"
 uuid = "bac558e1-5e72-5ebc-8fee-abe8a469f55d"
 version = "1.4.1"
+
+[[deps.Osi_jll]]
+deps = ["Artifacts", "CoinUtils_jll", "CompilerSupportLibraries_jll", "JLLWrappers", "Libdl", "OpenBLAS32_jll", "Pkg"]
+git-tree-sha1 = "4f00d103782fb742e50886924eeea2fe722d3f7a"
+uuid = "7da25872-d9ce-5375-a4d3-7a845f58efdd"
+version = "0.10800.700+0"
 
 [[deps.PCRE2_jll]]
 deps = ["Artifacts", "Libdl"]
