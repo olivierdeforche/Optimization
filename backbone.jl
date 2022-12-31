@@ -1,6 +1,16 @@
-## Backbone to structure your code
+## Simplified Generation Expansion Planning Model (Greenfield & Brownfield)
 # author: Olivier Deforche & Bas Carpentero
 # last update: December 2022
+
+## Instructions on how to run the code
+# 1) Packages: Normally, the packages necessary should be installed automatically via the Manifest.toml file.
+# However, if necessary, it is possible to add packages by pressing: "alt gr + ]", after which you can enter "add [package name]"
+# 2) Solvers: There are three solvers out of which the runner can choose: Gurobi, Ipopt and Clp. Note that Gurobi is not free, 
+# and therefore it needs additional installation with licensing. (https://www.gurobi.com/solutions/gurobi-optimizer/)
+# 3) Type: The model is able to be implemented as a Greenfield or Brownfield, this can be selected at the build step.
+# 4) Output: The output are several graphs split up into three parts: 1 - outpout of the model, 2 - Lagrangian parameters (equality)
+# 3 - Lagrangian parameters (inequalty). The output gets saved in the 'current' directory julia is active in.     
+
 
 ## Step 0: Activate environment - ensure consistency accross computers
 using Pkg
@@ -22,7 +32,12 @@ print(ts)
 ## Step 2: create model & pass data to model
 using JuMP
 using Gurobi
-m = Model(optimizer_with_attributes(Gurobi.Optimizer))
+using Ipopt
+using Clp
+
+# m = Model(optimizer_with_attributes(Gurobi.Optimizer))
+# m = Model(optimizer_with_attributes(Ipopt.Optimizer))
+m = Model(optimizer_with_attributes(Clp.Optimizer))
 
 # Step 2a: create sets
 function define_sets!(m::Model, data::Dict)
@@ -101,7 +116,7 @@ process_parameters!(m, data, repr_days)
 
 
 ## Step 3: construct your model
-# Greenfield GEP - single year (Lecture 3 - slide 25, but based on representative days instead of full year)
+# Greenfield GEP - single year based on representative days
 function build_greenfield_1Y_GEP_model!(m::Model)
     # Clear m.ext entries "variables", "expressions" and "constraints"
     m.ext[:variables] = Dict()
@@ -161,7 +176,7 @@ function build_greenfield_1Y_GEP_model!(m::Model)
 end
 
 
-# Brownfield GEP - single year
+# Brownfield GEP - single year based on representative days
 function build_brownfield_1Y_GEP_model!(m::Model)
     # start from Greenfield
     m = build_greenfield_1Y_GEP_model!(m::Model)
@@ -206,10 +221,9 @@ end
 
 # Build your model
 build_greenfield_1Y_GEP_model!(m)
-build_brownfield_1Y_GEP_model!(m)
+# build_brownfield_1Y_GEP_model!(m)
 
 ## Step 4: solve
-# current model is incomplete, so all variables and objective will be zero
 optimize!(m)
 
 # check termination status
@@ -282,7 +296,11 @@ for jd in 1:12
 
     # Save plots
     # savefig("simple"*"day"*string(jd)*"Gurobi")
-    savefig("simple"*"day"*string(jd)*"Gurobi"*"Brown")
+    # savefig("simple"*"day"*string(jd)*"Ipopt")
+    savefig("simple"*"day"*string(jd)*"Clp")
+    # savefig("simple"*"day"*string(jd)*"Gurobi"*"Brown")
+    # savefig("simple"*"day"*string(jd)*"Ipopt"*"Brown")
+    # savefig("simple"*"day"*string(jd)*"Clp"*"Brown")
 
 end
 print("done")
