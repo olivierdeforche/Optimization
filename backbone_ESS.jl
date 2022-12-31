@@ -1,6 +1,6 @@
 ## Backbone to structure your code
-# author: Olivier Deforche
-# last update: December 2022, 2022
+# author: Olivier Deforche & Bas Carpentero
+# last update: December 2022
 
 ## Step 0: Activate environment - ensure consistency accross computers
 using Pkg
@@ -20,10 +20,14 @@ ts = CSV.read(joinpath(@__DIR__, "Profiles_12_reprdays.csv"), DataFrame)
 using JuMP
 using Gurobi
 using Ipopt
+using Clp
 
 # Choose Optimizer
-m = Model(optimizer_with_attributes(Gurobi.Optimizer))
+# m = Model(optimizer_with_attributes(Gurobi.Optimizer))
 # m = Model(optimizer_with_attributes(Ipopt.Optimizer))
+m = Model(optimizer_with_attributes(Clp.Optimizer))
+# JuMP.set_optimizer_attribute(m, "LogLevel", 4)
+# JuMP.set_optimizer_attribute(m, "Algorithm", 4)
 
 # Step 2a: create sets
 function define_sets!(m::Model, data::Dict)
@@ -191,11 +195,6 @@ function build_greenfield_1Y_GEP_model!(m::Model)
         E[z,jh,jd] == E[z,jh-1,jd] + P_abs[z,jh,jd] - P_sup[z,jh,jd]
     )
 
-    # #4b1 - 1st hour of the day constraint (Kristof) #Change
-    # m.ext[:constraints][:con4b1] = @constraint(m, [z=Z,jd=JD],
-    #     E[z,1,jd] == E[z,24,jd]
-    # )
-
     #4b1 - 1st hour of the day constraint (Paper) #Change
     m.ext[:constraints][:con4b1] = @constraint(m, [z=Z,jd=JD],
         E[z,1,jd] == E_max[z]*SOC_min[z]
@@ -329,11 +328,13 @@ P_sup = value.(m.ext[:variables][:P_sup]) #Change
 E = value.(m.ext[:variables][:E]) #Change
 
 # create arrays for plotting
+λvec = [λ[jh,jd]/W[jd] for jh in JH, jd in JD]
 gvec = [g[i,jh,jd] for i in I, jh in JH, jd in JD]
 capvec = [cap[i] for  i in I]
 ESSvec = [E[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
 P_absvec  = [P_abs[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
 P_supvec = [P_sup[z,jh,jd] for z in Z, jh in JH, jd in JD] #Change
+
 
 
 for jd in 1:12
@@ -381,7 +382,6 @@ print("done")
 λ5 = dual.(m.ext[:constraints][:con4b3])
 
 zero = zeros(1,12)
-λvec = [λ[jh,jd]/W[jd] for jh in JH, jd in JD]
 λ2vec_PSH = [λ2["PSH",:,:]; zero]
 λ2vec_PSH = [λ2vec_PSH[jh,jd]/W[jd] for jh in JH, jd in JD]
 λ2vec_BESS = [λ2["BESS",:,:]; zero]
@@ -404,7 +404,7 @@ for jd in 1:12
 
     # Save plots
     # savefig("day"*string(jd)*"Ipopt"*"lagrange")
-    savefig("day"*string(jd)*"Gurobi"*"lagrange")
+    savefig("day"*string(jd)*"Gurobi"*"lagrange"*"eq")
     # savefig("day"*string(jd)*"Gurobi"*"Brown"*"lagrange")
     # savefig("day"*string(jd)*"ipopt"*"Brown"*"lagrange")
 
@@ -415,8 +415,8 @@ p1 = plot(JD, λ3vec_PSH[:], label ="λ3 PSH", xlabel="Timesteps [-]", ylabel="�
 p2 = plot(JD, λ3vec_BESS[:], label ="λ3 BESS", xlabel="Timesteps [-]", ylabel="λ3 BESS [M]", legend=:outertopright, lindewidth=3, lc=:red);
 p3= plot(JD, λ4vec_PSH[:], label ="λ4 PSH", xlabel="Timesteps [-]", ylabel="λ4 PSH [M]", legend=:outertopright, lindewidth=3, lc=:red);
 p4 = plot(JD, λ4vec_BESS[:], label ="λ4 BESS", xlabel="Timesteps [-]", ylabel="λ4 BESS [M]", legend=:outertopright, lindewidth=3, lc=:red);
-p5 = plot(JD, λ5vec_PSH[:], label ="λ5 PSH", xlabel="Timesteps [-]", ylabel="λ3 PSH [M]", legend=:outertopright, lindewidth=3, lc=:red);
-p6 = plot(JD, λ5vec_BESS[:], label ="λ5 BESS", xlabel="Timesteps [-]", ylabel="λ3 BESS [M]", legend=:outertopright, lindewidth=3, lc=:red);
+p5 = plot(JD, λ5vec_PSH[:], label ="λ5 PSH", xlabel="Timesteps [-]", ylabel="λ5 PSH [M]", legend=:outertopright, lindewidth=3, lc=:red);
+p6 = plot(JD, λ5vec_BESS[:], label ="λ5 BESS", xlabel="Timesteps [-]", ylabel="λ5 BESS [M]", legend=:outertopright, lindewidth=3, lc=:red);
 
 plot(p1, p2, p3, p4,p5,p6, layout = (6,1))
 plot!(size=(700,700))
@@ -424,6 +424,7 @@ plot!(size=(700,700))
 savefig("Gurobi"*"lagrange")
 # savefig("Gurobi"*"Brown"*"lagrange")
 # savefig("ipopt"*"Brown"*"lagrange")
+
 
 # Lagrangian parameters inequality constraints
 μ4 = dual.(m.ext[:constraints][:con3a1res])
@@ -436,13 +437,15 @@ savefig("Gurobi"*"lagrange")
 μ11 = dual.(m.ext[:constraints][:con4c3])
 
 
-μ4vec = [μ4[i,jh,jd] for i in IV, jh in JH, jd in JD]
-μ5vec = [μ5[i,jh,jd] for i in ID, jh in JH, jd in JD]
-μ6vec = [μ6[Z,jh,jd] for z in Z, jh in JH, jd in JD]
-μ8vec = [μ8[Z,jh,jd] for z in Z, jh in JH, jd in JD]
-μ10vec = [μ10[Z,jh,jd] for z in Z, jh in JH, jd in JD]
-μ6vec[2,3,1,1,5]
-μ5vec[2,3]
+
+μ4vec = [μ4[i,jh,jd]/W[jd] for i in IV, jh in JH, jd in JD]
+μ5vec = [μ5[i,jh,jd]/W[jd] for i in ID, jh in JH, jd in JD]
+μ6vec = [μ6[z,jh,jd]/W[jd] for z in Z, jh in JH, jd in JD]
+μ8vec = [μ8[z,jh,jd]/W[jd] for z in Z, jh in JH, jd in JD]
+μ10vec = [μ10[z,jh,jd]/W[jd] for z in Z, jh in JH, jd in JD]
+
+
+
 for jd in 1:12
     p1 = plot(JH, μ4vec[1,:,jd], label ="Wind", xlabel="Timesteps [-]", ylabel="μ4", legend=:outertopright, lindewidth=3, lc=:red);
     plot!(p1, JH,  μ4vec[2,:,jd], label ="Solar", xlabel="Timesteps [-]", ylabel="μ4", legend=:outertopright, lindewidth=3, lc=:black);
@@ -463,28 +466,12 @@ for jd in 1:12
 
     # Save plots
     # savefig("day"*string(jd)*"Ipopt"*"lagrange")
-    savefig("day"*string(jd)*"Gurobi"*"lagrange")
+    savefig("day"*string(jd)*"Gurobi"*"lagrange"*"ineq")
     # savefig("day"*string(jd)*"Gurobi"*"Brown"*"lagrange")
     # savefig("day"*string(jd)*"ipopt"*"Brown"*"lagrange")
 
 end
 print("done")
-
-# p1 = plot(JD, λ3vec_PSH[:], label ="λ3 PSH", xlabel="Timesteps [-]", ylabel="λ3 PSH [M]", legend=:outertopright, lindewidth=3, lc=:red);
-# p2 = plot(JD, λ3vec_BESS[:], label ="λ3 BESS", xlabel="Timesteps [-]", ylabel="λ3 BESS [M]", legend=:outertopright, lindewidth=3, lc=:red);
-# p3= plot(JD, λ4vec_PSH[:], label ="λ4 PSH", xlabel="Timesteps [-]", ylabel="λ4 PSH [M]", legend=:outertopright, lindewidth=3, lc=:red);
-# p4 = plot(JD, λ4vec_BESS[:], label ="λ4 BESS", xlabel="Timesteps [-]", ylabel="λ4 BESS [M]", legend=:outertopright, lindewidth=3, lc=:red);
-# p5 = plot(JD, λ5vec_PSH[:], label ="λ5 PSH", xlabel="Timesteps [-]", ylabel="λ3 PSH [M]", legend=:outertopright, lindewidth=3, lc=:red);
-# p6 = plot(JD, λ5vec_BESS[:], label ="λ5 BESS", xlabel="Timesteps [-]", ylabel="λ3 BESS [M]", legend=:outertopright, lindewidth=3, lc=:red);
-
-# plot(p1, p2, p3, p4,p5,p6, layout = (6,1))
-# plot!(size=(700,700))
-# # savefig("Ipopt"*"lagrange")
-# savefig("Gurobi"*"lagrange")
-# # savefig("Gurobi"*"Brown"*"lagrange")
-# # savefig("ipopt"*"Brown"*"lagrange")
-
-
 
 
 # Oli: Overleaf: context + model + oplossing

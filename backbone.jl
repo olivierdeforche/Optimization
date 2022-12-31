@@ -1,8 +1,6 @@
 ## Backbone to structure your code
-# author: Kenneth Bruninx
-# last update: October 26, 2020
-# description: backbone to structure your code. You're not obliged to use this
-# in your assignment, but you may.
+# author: Olivier Deforche & Bas Carpentero
+# last update: December 2022
 
 ## Step 0: Activate environment - ensure consistency accross computers
 using Pkg
@@ -145,7 +143,7 @@ function build_greenfield_1Y_GEP_model!(m::Model)
     )
 
     # 2a - power balance
-    m.ext[:constraints][:con2a] = @constraint(m, [jh=JH,jd=JD,z=Z],
+    m.ext[:constraints][:con2a] = @constraint(m, [jh=JH,jd=JD],
         sum(g[i,jh,jd] for i in I) == D[jh,jd] - ens[jh,jd]
     )
     
@@ -195,7 +193,7 @@ function build_brownfield_1Y_GEP_model!(m::Model)
     # define new constraints
     # 3a1 - renewables
     m.ext[:constraints][:con3a1res] = @constraint(m, [i=IV, jh=JH, jd =JD],
-        g(i,jh,jd) <= AF[i][jh,jd]*(cap[i]+LC[i])
+        g[i,jh,jd] <= AF[i][jh,jd]*(cap[i]+LC[i])
     )
 
     # 3a1 - conventional
@@ -207,7 +205,7 @@ function build_brownfield_1Y_GEP_model!(m::Model)
 end
 
 # Build your model
-# build_greenfield_1Y_GEP_model!(m)
+build_greenfield_1Y_GEP_model!(m)
 build_brownfield_1Y_GEP_model!(m)
 
 ## Step 4: solve
@@ -244,6 +242,9 @@ I = m.ext[:sets][:I]
 D = m.ext[:timeseries][:D]
 W = m.ext[:parameters][:W]
 LC = m.ext[:parameters][:LC]
+AF = m.ext[:timeseries][:AF] 
+Wind = AF["Wind"]
+Solar = AF["Solar"]
 
 # variables/expressions
 cap = value.(m.ext[:variables][:cap])
@@ -255,23 +256,33 @@ curt = value.(m.ext[:expressions][:curt])
 # create arrays for plotting
 λvec = [λ[jh,jd]/W[jd] for jh in JH, jd in JD]
 gvec = [g[i,jh,jd] for i in I, jh in JH, jd in JD]
+ensvec = [ens[jh,jd] for jh in JH, jd in JD]
 capvec = [cap[i] for  i in I]
 
 
-# Select day for which you'd like to plotting
-jd = 1
+for jd in 1:12
+    # Electricity price 
+    p1 = plot(JH,λvec[:,jd], xlabel="Timesteps [-]", ylabel="λ [EUR/MWh]", label="λ [EUR/MWh]", legend=:outertopright);
 
-# Electricity price 
-p1 = plot(JH,λvec[:,jd], xlabel="Timesteps [-]", ylabel="λ [EUR/MWh]", label="λ [EUR/MWh]", legend=:outertopright );
+    # Dispatch
+    p2 = groupedbar(transpose(gvec[:,:,jd]), label=["Mid" "Base" "Peak" "Wind" "Solar"], bar_position = :stack,legend=:outertopright,ylims=(0,13_000));
+    plot!(p2, JH, D[:,jd], label ="Demand", xlabel="Timesteps [-]", ylabel="Generation [MWh]", legend=:outertopright, lindewidth=3, lc=:black);
 
-# Dispatch
-p2 = groupedbar(transpose(gvec[:,:,jd]), label=["Mid" "Base" "Peak" "Wind" "Solar"], bar_position = :stack,legend=:outertopright,ylims=(0,13_000));
-plot!(p2, JH, D[:,jd], label ="Demand", xlabel="Timesteps [-]", ylabel="Generation [MWh]", legend=:outertopright, lindewidth=3, lc=:black);
+    # Capacity
+    p3 = bar(capvec, label="", xticks=(1:length(capvec), ["Mid" "Base" "Peak" "Wind" "Solar"]), xlabel="Technology [-]", ylabel="New capacity [MW]", legend=:outertopright);
 
-# Capacity
-p3 = bar(capvec, label="", xticks=(1:length(capvec), ["Mid" "Base" "Peak" "Wind" "Solar"]), xlabel="Technology [-]", ylabel="New capacity [MW]", legend=:outertopright);
+    # AF
+    p4 = plot(JH, Wind[:,jd],  label ="Wind", lindewidth=3, lc=:black);
+    plot!(p4, JH, Solar[:,jd], label ="Solar", xlabel="Timesteps [-]", ylabel="AF [0-1]", legend=:outertopright, lindewidth=3, lc=:red,ylims=(0,1));
 
+    # combine
+    plot(p1, p2, p3, p4, layout = (4,1))
+    # plot!()
+    plot!(size=(700,700))
 
-# combine
-plot(p1, p2, p3, layout = (3,1))
-plot!(size=(1500,1500))
+    # Save plots
+    # savefig("simple"*"day"*string(jd)*"Gurobi")
+    savefig("simple"*"day"*string(jd)*"Gurobi"*"Brown")
+
+end
+print("done")
